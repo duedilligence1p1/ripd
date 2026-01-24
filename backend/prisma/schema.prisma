@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite doesn't support enums, so we use String fields with comments
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  password  String
+  name      String
+  role      String    @default("USER") // ADMIN, USER
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+}
+
+model Operator {
+  id         String   @id @default(uuid())
+  name       String
+  type       String   // AWS, Azure, KYC Provider, etc.
+  country    String?
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id                    String        @id @default(uuid())
+  name                  String
+  description           String?
+  controller            String        // Controlador de dados
+  dpoName               String        // Nome do DPO
+  dpoEmail              String?       // Email do DPO
+  
+  // Natureza do Tratamento - Checklist de Riscos
+  hasSensitiveData      Boolean       @default(false)
+  hasBiometricData      Boolean       @default(false)
+  hasProfileSurveillance Boolean      @default(false)
+  isRegulatedSector     Boolean       @default(true) // Setor de apostas é regulado
+  hasAutomatedDecision  Boolean       @default(false)
+  hasMinorData          Boolean       @default(false)
+  
+  // Categorias de Dados
+  dataCategories        String        @default("[]") // JSON array as string
+  collectionMethod      String?       // API, App, Website, etc.
+  
+  // Transferência Internacional
+  hasInternationalTransfer Boolean    @default(false)
+  transferCountries     String?       // JSON array as string
+  transferMechanism     String?       // Standard Clauses, Adequacy Decision, etc.
+  
+  // Bases Legais e Finalidades
+  purposes              String?       // JSON array as string
+  
+  // Retenção de Dados
+  retentionPeriodMonths Int?          // Período em meses
+  retentionJustification String?      // Justificativa legal (COAF/SPA)
+
+  // Aprovações e Assinaturas
+  preparerName          String?       // Nome do elaborador
+  preparerRole          String?       // Cargo do elaborador
+  managerName           String?       // Nome do gestor
+  managerRole           String?       // Cargo do gestor
+  
+  // Maturidade
+  maturityScore         Float         @default(0)
+  
+  status                String        @default("DRAFT") // DRAFT, IN_REVIEW, APPROVED, ARCHIVED
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  
+  // Relations
+  userId                String
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  operators             Operator[]
+  risks                 Risk[]
+  actions               ActionPlan[]
+}
+
+model Risk {
+  id            String    @id @default(uuid())
+  description   String
+  source        String    // Fonte do risco
+  impact        Int       // 1-5
+  probability   Int       // 1-5
+  criticalValue Int       // Calculado: impact x probability
+  level         String    // LOW, MEDIUM, HIGH, CRITICAL
+  mitigation    String?   // Medida de mitigação proposta
+  
+  projectId     String
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model ActionPlan {
+  id          String       @id @default(uuid())
+  measure     String       // Ex: MFA, Criptografia AES-256, TLS 1.3
+  description String?
+  responsible String       // Responsável pela implementação
+  deadline    DateTime
+  status      String       @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  priority    Int          @default(1) // 1-5
+  
+  projectId   String
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
