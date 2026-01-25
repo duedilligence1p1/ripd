@@ -12,19 +12,27 @@ const pdfRoutes = require('./routes/pdf');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-// Allow any origin that sends credentials (effectively reflect-origin)
-app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+// Middleware (Manual CORS)
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  // Allow Vercel and Localhost explicitly, or fallback to reflecting origin
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
 
-// Explicitly handle pre-flight
-app.options('*', cors());
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-app.use(helmet());
+  // Handle preflight immediately
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  next();
+});
+
+// app.use(helmet()); // Disabled for debugging
 app.use(express.json());
 
 // Health check
