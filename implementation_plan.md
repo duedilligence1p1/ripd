@@ -17,8 +17,18 @@ This plan outlines the steps to migrate the generic RIPD Manager application fro
 
 ## 3. GitHub Repository Setup
 
-## 4. Deployment Instructions (User Actions)
-- **GitHub**: User will need to run the final `git push`.
-- **Neon**: User needs to provide the connection string to put in `.env` (or set it in Render).
-- **Render**: Connect repo, set build command `npm install && npm run db:generate`, start command `npm start`.
-- **Vercel**: Connect repo, simple Next.js deployment.
+## 4. Deployment Instructions (Completed)
+- [x] **GitHub**: Repository pushed to `duedilligence1p1/ripd`.
+- [x] **Neon**: Database configured, schema synced, and seeded.
+- [x] **Backend (Railway)**: 
+  - Service configured with Root Directory `/backend`.
+  - Build Command: `npm install && npm run db:generate`.
+  - Start Command: `node src/index.js`.
+  - Env Vars: `DATABASE_URL`, `JWT_SECRET`, `PORT=3001`.
+  - Deployed successfully and handling CORS.
+- [x] **Frontend (Vercel)**:
+  - Project imported with Root Directory `frontend`.
+  - Env Var: `NEXT_PUBLIC_API_URL` pointing to Railway HTTPS URL.
+  - Deployed successfully.
+
+# Status: MIGRATION COMPLETE 🚀
