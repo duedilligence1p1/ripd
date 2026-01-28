@@ -48,9 +48,16 @@ export default function Step5ActionPlan({ projectId, actions, setActions, formDa
         status: 'PENDING'
     });
 
+    // Helper para verificar operador internacional
+    const isInternationalOperator = (op: { country?: string }) => {
+        if (!op.country) return false;
+        const c = op.country.toLowerCase().trim();
+        return !['brasil', 'brazil', 'br'].includes(c);
+    };
+
     // Verifica se há transferência internacional (operadores fora do país)
     const hasInternationalOperators = formData.hasInternationalTransfer ||
-        formData.operators.some(op => op.country && op.country !== 'Brasil' && op.country !== 'BR');
+        formData.operators.some(isInternationalOperator);
 
     // Seleciona as medidas baseado na transferência internacional
     const COMMON_MEASURES = hasInternationalOperators
@@ -142,6 +149,28 @@ export default function Step5ActionPlan({ projectId, actions, setActions, formDa
         return new Date(deadline) < new Date();
     };
 
+    const handleOpenDueDiligence = () => {
+        const internationalOp = formData.operators.find(isInternationalOperator);
+        const targetOp = internationalOp || formData.operators[0];
+
+        if (!targetOp) {
+            toast.error('Nenhum operador encontrado para Due Diligence');
+            return;
+        }
+
+        const params = new URLSearchParams({
+            operatorName: targetOp.name,
+            operatorCountry: targetOp.country || '',
+            operatorType: targetOp.type,
+            projectName: formData.name,
+            controller: formData.controller,
+            dpoName: formData.dpoName || '',
+            dpoEmail: formData.dpoEmail || ''
+        });
+
+        window.open(`https://dd.sykesec.com?${params.toString()}`, '_blank');
+    };
+
     return (
         <div className="space-y-8">
             <div>
@@ -181,13 +210,21 @@ export default function Step5ActionPlan({ projectId, actions, setActions, formDa
 
             {/* International Transfer Alert */}
             {hasInternationalOperators && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <p className="text-blue-700">
-                        <span className="font-medium">Transferência Internacional detectada.</span> As medidas recomendadas incluem Treinamento LGPD e Due Diligence para operadores estrangeiros.
-                    </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-2">
+                        <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-blue-700">
+                            <span className="font-medium">Transferência Internacional detectada.</span> As medidas recomendadas incluem Treinamento LGPD e Due Diligence para operadores estrangeiros.
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleOpenDueDiligence}
+                        className="ml-9 text-sm text-blue-700 underline font-medium hover:text-blue-900"
+                    >
+                        Preencher Due Diligence Agora
+                    </button>
                 </div>
             )}
 
@@ -256,6 +293,20 @@ export default function Step5ActionPlan({ projectId, actions, setActions, formDa
                                         {action.description && (
                                             <p className="text-gray-600 text-sm mb-3">{action.description}</p>
                                         )}
+
+                                        {action.measure.toLowerCase().includes('due diligence') && (
+                                            <div className="mb-4">
+                                                <button
+                                                    onClick={handleOpenDueDiligence}
+                                                    className="text-sm px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors flex items-center gap-2"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                    </svg>
+                                                    Preencher Due Diligence no dd.sykesec.com
+                                                </button>
+                                            </div>
+                                        )}
                                         <div className="flex gap-6 text-sm text-gray-500">
                                             <span className="flex items-center gap-1">
                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,132 +355,152 @@ export default function Step5ActionPlan({ projectId, actions, setActions, formDa
                         );
                     })}
                 </div>
-            )}
+            )
+            }
 
             {/* Add Action Form */}
-            {isAdding ? (
-                <div className="bg-primary-50 rounded-lg p-6 space-y-4">
-                    <h4 className="font-semibold text-gray-800">Adicionar Nova Ação</h4>
+            {
+                isAdding ? (
+                    <div className="bg-primary-50 rounded-lg p-6 space-y-4" >
+                        <h4 className="font-semibold text-gray-800">Adicionar Nova Ação</h4>
 
-                    <div className="grid md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                            <label className="label">Medida *</label>
-                            <input
-                                type="text"
-                                value={newAction.measure}
-                                onChange={(e) => setNewAction({ ...newAction, measure: e.target.value })}
-                                className="input"
-                                placeholder="Ex: Implementar criptografia AES-256"
-                            />
-                        </div>
-
-                        <div className="md:col-span-2">
-                            <label className="label">Descrição</label>
-                            <textarea
-                                value={newAction.description}
-                                onChange={(e) => setNewAction({ ...newAction, description: e.target.value })}
-                                className="input min-h-[80px]"
-                                placeholder="Detalhes sobre a implementação..."
-                            />
-                        </div>
-
-                        <div>
-                            <label className="label">Responsável *</label>
-                            <input
-                                type="text"
-                                value={newAction.responsible}
-                                onChange={(e) => setNewAction({ ...newAction, responsible: e.target.value })}
-                                className="input"
-                                placeholder="Ex: Equipe de Segurança"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="label">Prazo *</label>
-                            <input
-                                type="date"
-                                value={newAction.deadline}
-                                onChange={(e) => setNewAction({ ...newAction, deadline: e.target.value })}
-                                className="input"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="label">Prioridade (1-5)</label>
-                            <div className="flex items-center gap-2">
+                        <div className="grid md:grid-cols-2 gap-4">
+                            <div className="md:col-span-2">
+                                <label className="label">Medida *</label>
                                 <input
-                                    type="range"
-                                    min={1}
-                                    max={5}
-                                    value={newAction.priority}
-                                    onChange={(e) => setNewAction({ ...newAction, priority: parseInt(e.target.value) })}
-                                    className="flex-1"
+                                    type="text"
+                                    value={newAction.measure}
+                                    onChange={(e) => setNewAction({ ...newAction, measure: e.target.value })}
+                                    className="input"
+                                    placeholder="Ex: Implementar criptografia AES-256"
                                 />
-                                <span className="w-16 text-center">{'⭐'.repeat(newAction.priority)}</span>
+                            </div>
+
+                            {newAction.measure.toLowerCase().includes('due diligence') && (
+                                <div className="md:col-span-2 bg-indigo-50 p-4 rounded-lg border border-indigo-100 flex items-center justify-between">
+                                    <div className="text-sm text-indigo-800">
+                                        <span className="font-semibold">Ação Recomendada:</span> Preencher formulário de Due Diligence externo.
+                                    </div>
+                                    <button
+                                        onClick={handleOpenDueDiligence}
+                                        type="button"
+                                        className="text-sm px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                        Preencher Agora
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="md:col-span-2">
+                                <label className="label">Descrição</label>
+                                <textarea
+                                    value={newAction.description}
+                                    onChange={(e) => setNewAction({ ...newAction, description: e.target.value })}
+                                    className="input min-h-[80px]"
+                                    placeholder="Detalhes sobre a implementação..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="label">Responsável *</label>
+                                <input
+                                    type="text"
+                                    value={newAction.responsible}
+                                    onChange={(e) => setNewAction({ ...newAction, responsible: e.target.value })}
+                                    className="input"
+                                    placeholder="Ex: Equipe de Segurança"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="label">Prazo *</label>
+                                <input
+                                    type="date"
+                                    value={newAction.deadline}
+                                    onChange={(e) => setNewAction({ ...newAction, deadline: e.target.value })}
+                                    className="input"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="label">Prioridade (1-5)</label>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="range"
+                                        min={1}
+                                        max={5}
+                                        value={newAction.priority}
+                                        onChange={(e) => setNewAction({ ...newAction, priority: parseInt(e.target.value) })}
+                                        className="flex-1"
+                                    />
+                                    <span className="w-16 text-center">{'⭐'.repeat(newAction.priority)}</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
+                        <div className="flex gap-3">
+                            <button
+                                onClick={addAction}
+                                disabled={isSaving === 'new' || !projectId}
+                                className="btn-primary flex items-center gap-2"
+                            >
+                                {isSaving === 'new' && <div className="spinner w-4 h-4"></div>}
+                                Adicionar Ação
+                            </button>
+                            <button
+                                onClick={() => setIsAdding(false)}
+                                className="btn-secondary"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                ) : (
                     <div className="flex gap-3">
                         <button
-                            onClick={addAction}
-                            disabled={isSaving === 'new' || !projectId}
-                            className="btn-primary flex items-center gap-2"
+                            onClick={() => setIsAdding(true)}
+                            disabled={!projectId}
+                            className="btn-primary flex items-center gap-2 disabled:opacity-50"
                         >
-                            {isSaving === 'new' && <div className="spinner w-4 h-4"></div>}
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
                             Adicionar Ação
                         </button>
+
                         <button
-                            onClick={() => setIsAdding(false)}
-                            className="btn-secondary"
+                            onClick={async () => {
+                                if (!projectId) return;
+                                if (!confirm('Deseja gerar ações automaticamente com base nos riscos e respostas anteriores?')) return;
+
+                                setIsSaving('generate');
+                                try {
+                                    const response = await actionsApi.generate(projectId);
+                                    setActions([...actions, ...response.data]);
+                                    toast.success('Ações geradas com sucesso!');
+                                } catch (error) {
+                                    toast.error('Erro ao gerar ações');
+                                } finally {
+                                    setIsSaving(null);
+                                }
+                            }}
+                            disabled={!projectId || isSaving === 'generate'}
+                            className="btn-secondary flex items-center gap-2 disabled:opacity-50"
                         >
-                            Cancelar
+                            {isSaving === 'generate' ? (
+                                <div className="spinner w-4 h-4"></div>
+                            ) : (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            )}
+                            Gerar Automático
                         </button>
                     </div>
-                </div>
-            ) : (
-                <div className="flex gap-3">
-                    <button
-                        onClick={() => setIsAdding(true)}
-                        disabled={!projectId}
-                        className="btn-primary flex items-center gap-2 disabled:opacity-50"
-                    >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Adicionar Ação
-                    </button>
-
-                    <button
-                        onClick={async () => {
-                            if (!projectId) return;
-                            if (!confirm('Deseja gerar ações automaticamente com base nos riscos e respostas anteriores?')) return;
-
-                            setIsSaving('generate');
-                            try {
-                                const response = await actionsApi.generate(projectId);
-                                setActions([...actions, ...response.data]);
-                                toast.success('Ações geradas com sucesso!');
-                            } catch (error) {
-                                toast.error('Erro ao gerar ações');
-                            } finally {
-                                setIsSaving(null);
-                            }
-                        }}
-                        disabled={!projectId || isSaving === 'generate'}
-                        className="btn-secondary flex items-center gap-2 disabled:opacity-50"
-                    >
-                        {isSaving === 'generate' ? (
-                            <div className="spinner w-4 h-4"></div>
-                        ) : (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                            </svg>
-                        )}
-                        Gerar Automático
-                    </button>
-                </div>
-            )}
+                )}
         </div>
     );
 }
