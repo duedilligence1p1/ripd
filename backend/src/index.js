@@ -8,6 +8,7 @@ const projectRoutes = require('./routes/projects');
 const riskRoutes = require('./routes/risks');
 const actionRoutes = require('./routes/actions');
 const pdfRoutes = require('./routes/pdf');
+const chatRoutes = require('./routes/chat');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -46,6 +47,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/risks', riskRoutes);
 app.use('/api/actions', actionRoutes);
 app.use('/api/pdf', pdfRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

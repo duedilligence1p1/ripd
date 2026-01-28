@@ -12,6 +12,7 @@ import Step3DataLifecycle from '@/components/Steps/Step3DataLifecycle';
 import Step4RiskMatrix from '@/components/Steps/Step4RiskMatrix';
 import Step5ActionPlan from '@/components/Steps/Step5ActionPlan';
 import Step6Signatures from '@/components/Steps/Step6Signatures';
+import ChatBot from '@/components/ChatBot';
 
 const STEPS = [
     { id: 1, title: 'Agentes e Projeto', description: 'Identificação básica' },
@@ -350,6 +351,7 @@ export default function ProjectPage() {
                     </div>
                 </div>
             </div>
+            <ChatBot formData={formData} />
         </main>
     );
 }
