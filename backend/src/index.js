@@ -46,6 +46,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Debug endpoint to check env vars in production (does not expose values)
+app.get('/api/debug/env', (req, res) => {
+  res.json({
+    GROQ_API_KEY: process.env.GROQ_API_KEY ? 'Present' : 'Missing',
+    DATABASE_URL: process.env.DATABASE_URL ? 'Present' : 'Missing',
+    JWT_SECRET: process.env.JWT_SECRET ? 'Present' : 'Missing',
+    NODE_ENV: process.env.NODE_ENV || 'not set',
+    PORT: process.env.PORT || 'not set'
+  });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
