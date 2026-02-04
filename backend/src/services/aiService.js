@@ -2,8 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('fs');
 const path = require('path');
 
-// Initialize Gemini API
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Initialize Gemini API (now handled lazily)
 
 /**
  * Generate a response using Gemini AI
@@ -13,10 +12,13 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
  */
 async function generateChatResponse(message, context) {
     try {
+        console.log('GEMINI_API_KEY status:', process.env.GEMINI_API_KEY ? 'Present' : 'Missing');
+
         if (!process.env.GEMINI_API_KEY) {
             return "O Gemini API Key não está configurado. Verifique o arquivo .env.";
         }
 
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
             model: "models/gemini-2.0-flash"
         });
@@ -106,6 +108,7 @@ async function generateRisksAI(project) {
             throw new Error('API Key não configurada');
         }
 
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
             model: "models/gemini-2.0-flash",
             generationConfig: { responseMimeType: "application/json" }
@@ -149,6 +152,7 @@ async function generateActionsAI(project, risks) {
             throw new Error('API Key não configurada');
         }
 
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({
             model: "models/gemini-2.0-flash",
             generationConfig: { responseMimeType: "application/json" }
