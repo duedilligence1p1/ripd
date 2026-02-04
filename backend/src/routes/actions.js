@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authMiddleware } = require('../middleware/auth');
+const { generateActionsAI } = require('../services/aiService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -95,7 +96,20 @@ router.post('/generate', async (req, res) => {
             hasAutomatedDecision: Boolean(project.hasAutomatedDecision)
         };
 
-        const generatedActions = generateActionsForProject(parsedProject, project.risks);
+        // Try AI generation first
+        let generatedActions = await generateActionsAI(parsedProject, project.risks);
+
+        if (!generatedActions || generatedActions.length === 0) {
+            console.log('Falling back to static action generator');
+            generatedActions = generateActionsForProject(parsedProject, project.risks);
+        } else {
+            // Ensure dates are correctly formatted for Prisma
+            generatedActions = generatedActions.map(action => ({
+                ...action,
+                deadline: action.deadline ? new Date(action.deadline) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                status: 'PENDING'
+            }));
+        }
 
         // Create actions in transaction
         const createdActions = await prisma.$transaction(

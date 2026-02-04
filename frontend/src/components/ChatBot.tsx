@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { ProjectFormData } from '@/app/project/[id]/page';
 import api from '@/services/api';
+import { ProjectFormData, Risk, Action } from '@/app/project/[id]/page';
 
 interface ChatBotProps {
     formData: ProjectFormData;
+    risks?: Risk[];
+    actions?: Action[];
+    currentStep?: number;
 }
 
 interface Message {
@@ -15,7 +18,7 @@ interface Message {
     timestamp: Date;
 }
 
-export default function ChatBot({ formData }: ChatBotProps) {
+export default function ChatBot({ formData, risks = [], actions = [], currentStep = 1 }: ChatBotProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -54,16 +57,26 @@ export default function ChatBot({ formData }: ChatBotProps) {
         setIsLoading(true);
 
         try {
-            // Call backend API (or mock locally for now if API not ready)
+            // Call backend API with real context from formData
             const response = await api.post('/chat', {
                 message: userMsg.text,
                 context: {
-                    maturityScore: 0.49, // From context provided
-                    gaps: ['Gestão de Vulnerabilidades', 'Resposta a Incidentes'],
                     projectName: formData.name,
-                    hasSensitiveData: formData.hasSensitiveData
+                    hasSensitiveData: formData.hasSensitiveData,
+                    hasBiometricData: formData.hasBiometricData,
+                    hasMinorData: formData.hasMinorData,
+                    hasAutomatedDecision: formData.hasAutomatedDecision,
+                    hasProfileSurveillance: formData.hasProfileSurveillance,
+                    isRegulatedSector: formData.isRegulatedSector,
+                    dataCategories: formData.dataCategories,
+                    purposes: formData.purposes.map((p: any) => p.purpose),
+                    // Add risks and actions for deeper context
+                    risks: risks.map(r => ({ description: r.description, level: r.level })),
+                    actions: actions.map(a => ({ measure: a.measure, status: a.status })),
+                    currentStep: currentStep
                 }
             });
+
 
             const botMsg: Message = {
                 id: (Date.now() + 1).toString(),
@@ -73,10 +86,13 @@ export default function ChatBot({ formData }: ChatBotProps) {
             };
 
             setMessages(prev => [...prev, botMsg]);
-        } catch (error) {
+        } catch (error: any) {
+            console.error('Chat error:', error);
+            const errorMessage = error.response?.data?.error || 'Desculpe, tive um problema ao processar sua solicitação. Verifique se o serviço de IA está configurado corretamente ou tente novamente mais tarde.';
+
             const errorMsg: Message = {
                 id: (Date.now() + 1).toString(),
-                text: 'Desculpe, tive um problema ao processar sua solicitação. Tente novamente.',
+                text: errorMessage,
                 sender: 'bot',
                 timestamp: new Date()
             };
@@ -126,8 +142,8 @@ export default function ChatBot({ formData }: ChatBotProps) {
                             >
                                 <div
                                     className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${msg.sender === 'user'
-                                            ? 'bg-primary-600 text-white rounded-br-none'
-                                            : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                                        ? 'bg-primary-600 text-white rounded-br-none'
+                                        : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
                                         }`}
                                 >
                                     {msg.text}
@@ -167,7 +183,7 @@ export default function ChatBot({ formData }: ChatBotProps) {
                             </button>
                         </div>
                         <p className="text-[10px] text-gray-400 text-center mt-2">
-                            IA focada em RIPD. Gaps identificados: Vulnerabilidades.
+                            IA focada em RIPD. {risks.length > 0 ? `${risks.length} riscos identificados.` : 'Nenhum risco mapeado ainda.'}
                         </p>
                     </form>
                 </div>

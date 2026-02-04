@@ -351,7 +351,7 @@ export default function ProjectPage() {
                     </div>
                 </div>
             </div>
-            <ChatBot formData={formData} />
+            <ChatBot formData={formData} risks={risks} actions={actions} currentStep={currentStep} />
         </main>
     );
 }

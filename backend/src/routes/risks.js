@@ -2,6 +2,7 @@ const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const { authMiddleware } = require('../middleware/auth');
 const { calculateRiskLevel } = require('../services/riskCalculator');
+const { generateRisksAI } = require('../services/aiService');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -106,7 +107,24 @@ router.post('/generate', async (req, res) => {
             hasAutomatedDecision: Boolean(project.hasAutomatedDecision)
         };
 
-        const generatedRisks = generateRisksForProject(parsedProject);
+        // Try AI generation first
+        let generatedRisks = await generateRisksAI(parsedProject);
+
+        // Fallback to static generator if AI fails or returns empty
+        if (!generatedRisks || generatedRisks.length === 0) {
+            console.log('Falling back to static risk generator');
+            generatedRisks = generateRisksForProject(parsedProject);
+        } else {
+            // Ensure levels are calculated for AI generated risks
+            generatedRisks = generatedRisks.map(risk => {
+                const criticalValue = risk.impact * risk.probability;
+                return {
+                    ...risk,
+                    criticalValue,
+                    level: calculateRiskLevel(criticalValue)
+                };
+            });
+        }
 
         // Create risks in transaction
         const createdRisks = await prisma.$transaction(
