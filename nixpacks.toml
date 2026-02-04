@@ -1,5 +1,8 @@
+# Nixpacks configuration for Railway
+# Using only Node.js 18 to avoid version collision
+
 [phases.setup]
-nixPkgs = ["nodePackages.npm", "nodejs_18"]
+nixPkgs = ["nodejs_18"]
 
 [phases.install]
 cmds = ["cd backend && npm install"]
