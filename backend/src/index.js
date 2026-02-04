@@ -1,4 +1,9 @@
-require('dotenv').config();
+const result = require('dotenv').config();
+if (result.error) {
+  console.error('Error loading .env file:', result.error);
+} else {
+  console.log('.env file loaded successfully');
+}
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');

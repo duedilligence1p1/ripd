@@ -15,6 +15,7 @@ async function generateChatResponse(message, context) {
         console.log('GEMINI_API_KEY status:', process.env.GEMINI_API_KEY ? 'Present' : 'Missing');
 
         if (!process.env.GEMINI_API_KEY) {
+            console.error('CRITICAL: GEMINI_API_KEY is missing in process.env');
             return "O Gemini API Key não está configurado. Verifique o arquivo .env.";
         }
 
