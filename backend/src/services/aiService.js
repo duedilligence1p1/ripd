@@ -1,28 +1,33 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 const fs = require('fs');
 const path = require('path');
 
-// Initialize Gemini API (now handled lazily)
+// Initialize Groq client lazily
+let groqClient = null;
+
+function getGroqClient() {
+    if (!groqClient && process.env.GROQ_API_KEY) {
+        groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    }
+    return groqClient;
+}
 
 /**
- * Generate a response using Gemini AI
- * @param {string} prompt - The user message
+ * Generate a response using Groq AI (Llama model)
+ * @param {string} message - The user message
  * @param {Object} context - Contextual data (project details, gaps, etc.)
  * @returns {Promise<string>} AI generated response
  */
 async function generateChatResponse(message, context) {
     try {
-        console.log('GEMINI_API_KEY status:', process.env.GEMINI_API_KEY ? 'Present' : 'Missing');
+        console.log('GROQ_API_KEY status:', process.env.GROQ_API_KEY ? 'Present' : 'Missing');
 
-        if (!process.env.GEMINI_API_KEY) {
-            console.error('CRITICAL: GEMINI_API_KEY is missing in process.env');
-            return "O Gemini API Key não está configurado. Verifique o arquivo .env.";
+        if (!process.env.GROQ_API_KEY) {
+            console.error('CRITICAL: GROQ_API_KEY is missing in process.env');
+            return "O Groq API Key não está configurado. Verifique o arquivo .env.";
         }
 
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({
-            model: "models/gemini-2.0-flash"
-        });
+        const client = getGroqClient();
 
         const risksInfo = context.risks && context.risks.length > 0
             ? context.risks.map(r => `- ${r.description} (Nível: ${r.level})`).join('\n')
@@ -32,7 +37,7 @@ async function generateChatResponse(message, context) {
             ? context.actions.map(a => `- ${a.measure} (Status: ${a.status})`).join('\n')
             : 'Nenhum plano de ação.';
 
-        const roleContext = `Você é o DPO Co-Pilot, assistente especialista em LGPD e RIPD.
+        const systemPrompt = `Você é o DPO Co-Pilot, assistente especialista em LGPD e RIPD.
 Projeto: "${context.projectName || 'sem nome'}"
 Passo Atual: ${context.currentStep || 1} / 6 (${getStepName(context.currentStep)})
 
@@ -53,44 +58,39 @@ Instruções:
 - Use o contexto acima para enriquecer sua resposta.
 - Se for uma pergunta teórica sobre LGPD, explique claramente.
 - Se for sobre o preenchimento, sugira o que fazer neste passo ${context.currentStep}.
-`;
+- Responda sempre em português brasileiro.`;
 
-        const chat = model.startChat({
-            history: [
-                {
-                    role: "user",
-                    parts: [{ text: roleContext }],
-                },
-                {
-                    role: "model",
-                    parts: [{ text: "Entendido. Sou o DPO Co-Pilot e estou pronto para ajudar com base no contexto do seu projeto. O que você gostaria de saber?" }],
-                },
-            ],
-        });
-
-        console.log('--- ENVIANDO PARA IA ---');
+        console.log('--- ENVIANDO PARA GROQ ---');
         console.log('Pergunta:', message);
 
-        const result = await chat.sendMessage(message);
-        const response = await result.response;
-        return response.text();
+        const chatCompletion = await client.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: message }
+            ],
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.7,
+            max_tokens: 1024,
+        });
+
+        return chatCompletion.choices[0]?.message?.content || "Desculpe, não consegui gerar uma resposta.";
     } catch (error) {
         const errorLog = `
---- GEMINI ERROR ${new Date().toISOString()} ---
+--- GROQ ERROR ${new Date().toISOString()} ---
 Message: ${error.message}
 Stack: ${error.stack}
 -----------------------------------
 `;
-        fs.appendFileSync(path.join(__dirname, '../../gemini-error.log'), errorLog);
-        console.error('--- GEMINI ERROR DETAILS ---');
+        fs.appendFileSync(path.join(__dirname, '../../groq-error.log'), errorLog);
+        console.error('--- GROQ ERROR DETAILS ---');
         console.error('Message:', error.message);
 
         // Handle specific error codes with user-friendly messages
-        if (error.message.includes('429') || error.message.includes('Too Many Requests') || error.message.includes('quota')) {
+        if (error.message.includes('429') || error.message.includes('Too Many Requests') || error.message.includes('rate')) {
             return "⚠️ Estamos com muitas requisições no momento. Por favor, aguarde alguns segundos e tente novamente.";
         }
-        if (error.message.includes('403') || error.message.includes('leaked') || error.message.includes('Forbidden')) {
-            return "⚠️ A chave de API está inválida ou foi bloqueada. Por favor, entre em contato com o administrador do sistema.";
+        if (error.message.includes('401') || error.message.includes('invalid') || error.message.includes('Unauthorized')) {
+            return "⚠️ A chave de API está inválida. Por favor, entre em contato com o administrador do sistema.";
         }
         if (error.message.includes('404') || error.message.includes('not found')) {
             return "⚠️ O modelo de IA não está disponível. Por favor, entre em contato com o suporte.";
@@ -118,15 +118,11 @@ function getStepName(step) {
  */
 async function generateRisksAI(project) {
     try {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!process.env.GROQ_API_KEY) {
             throw new Error('API Key não configurada');
         }
 
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({
-            model: "models/gemini-2.0-flash",
-            generationConfig: { responseMimeType: "application/json" }
-        });
+        const client = getGroqClient();
 
         const prompt = `Você é um analista de riscos de privacidade. Gere uma lista de riscos para o projeto: "${project.name}".
         Contexto:
@@ -138,7 +134,7 @@ async function generateRisksAI(project) {
         - Categorias: ${project.dataCategories}
         - Finalidades: ${project.purposes}
 
-        Retorne um array JSON de objetos com:
+        Retorne APENAS um array JSON válido de objetos com:
         - description: descrição clara do risco
         - source: fonte do risco (ex: Processamento indevido)
         - impact: 1 a 5
@@ -146,11 +142,22 @@ async function generateRisksAI(project) {
         - mitigation: sugestão de medida inicial
 
         Gere entre 4 e 6 riscos relevantes.
-        Formato: [ { "description": "...", "source": "...", "impact": 3, "probability": 2, "mitigation": "..." } ]`;
+        Retorne SOMENTE o JSON, sem texto adicional.`;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return JSON.parse(response.text());
+        const chatCompletion = await client.chat.completions.create({
+            messages: [{ role: "user", content: prompt }],
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.5,
+            max_tokens: 2048,
+        });
+
+        const responseText = chatCompletion.choices[0]?.message?.content || "[]";
+        // Extract JSON from response
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+        return JSON.parse(responseText);
     } catch (error) {
         console.error('AI Risk Gen Error:', error);
         return null; // Fallback to mock logic in route
@@ -162,15 +169,11 @@ async function generateRisksAI(project) {
  */
 async function generateActionsAI(project, risks) {
     try {
-        if (!process.env.GEMINI_API_KEY) {
+        if (!process.env.GROQ_API_KEY) {
             throw new Error('API Key não configurada');
         }
 
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({
-            model: "models/gemini-2.0-flash",
-            generationConfig: { responseMimeType: "application/json" }
-        });
+        const client = getGroqClient();
 
         const risksText = risks.map(r => r.description).join(', ');
 
@@ -179,18 +182,29 @@ async function generateActionsAI(project, risks) {
         Contexto:
         - Dados Sensíveis: ${project.hasSensitiveData}
         
-        Retorne um array JSON de objetos com:
+        Retorne APENAS um array JSON válido de objetos com:
         - measure: Nome da medida (ex: MFA)
         - description: O que deve ser feito
         - responsible: Área responsável (ex: TI)
         - priority: 1 a 5
 
         Gere medidas práticas para mitigar os riscos informados.
-        Formato: [ { "measure": "...", "description": "...", "responsible": "...", "priority": 5 } ]`;
+        Retorne SOMENTE o JSON, sem texto adicional.`;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        return JSON.parse(response.text());
+        const chatCompletion = await client.chat.completions.create({
+            messages: [{ role: "user", content: prompt }],
+            model: "llama-3.3-70b-versatile",
+            temperature: 0.5,
+            max_tokens: 2048,
+        });
+
+        const responseText = chatCompletion.choices[0]?.message?.content || "[]";
+        // Extract JSON from response
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+            return JSON.parse(jsonMatch[0]);
+        }
+        return JSON.parse(responseText);
     } catch (error) {
         console.error('AI Action Gen Error:', error);
         return null;
