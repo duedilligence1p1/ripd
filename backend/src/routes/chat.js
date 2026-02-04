@@ -16,8 +16,8 @@ router.post('/', async (req, res) => {
         res.json({ reply });
 
     } catch (error) {
-        console.error('Chat Error:', error);
-        res.status(500).json({ error: 'Erro ao processar mensagem pela IA' });
+        console.error('Chat Route Error:', error);
+        res.status(500).json({ error: 'Erro interno do servidor. Por favor, tente novamente.' });
     }
 });
 

@@ -84,7 +84,20 @@ Stack: ${error.stack}
         fs.appendFileSync(path.join(__dirname, '../../gemini-error.log'), errorLog);
         console.error('--- GEMINI ERROR DETAILS ---');
         console.error('Message:', error.message);
-        throw new Error('Falha ao processar resposta da IA: ' + error.message);
+
+        // Handle specific error codes with user-friendly messages
+        if (error.message.includes('429') || error.message.includes('Too Many Requests') || error.message.includes('quota')) {
+            return "⚠️ Estamos com muitas requisições no momento. Por favor, aguarde alguns segundos e tente novamente.";
+        }
+        if (error.message.includes('403') || error.message.includes('leaked') || error.message.includes('Forbidden')) {
+            return "⚠️ A chave de API está inválida ou foi bloqueada. Por favor, entre em contato com o administrador do sistema.";
+        }
+        if (error.message.includes('404') || error.message.includes('not found')) {
+            return "⚠️ O modelo de IA não está disponível. Por favor, entre em contato com o suporte.";
+        }
+
+        // Generic fallback
+        return "Desculpe, ocorreu um erro ao processar sua pergunta. Por favor, tente novamente mais tarde.";
     }
 }
 
